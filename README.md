@@ -1,130 +1,133 @@
-# Medicine Explainer — Setup & Deployment Guide
+# 💊 MedExplain AI
 
-## What this is
-Upload a photo of a medicine strip or prescription → Claude reads it and explains
-purpose, side effects, and timing in plain language.
+An AI-powered web app that explains any medicine strip or prescription photo in
+plain language — built for people who struggle to read handwritten prescriptions
+or unfamiliar medicine names, especially elderly or non-English-comfortable users.
 
----
-
-## PART 1 — Run it on your laptop (today, ~30 min)
-
-### Step 1: Open the project in Cursor
-1. Open Cursor
-2. File → Open Folder → select the `med-explainer` folder
-3. Open the built-in terminal in Cursor (Ctrl + `)
-
-### Step 2: Install Python dependencies
-In the Cursor terminal, run:
-```
-pip install -r requirements.txt
-```
-If you don't have Python installed, download it from python.org first
-(check "Add Python to PATH" during install).
-
-### Step 3: Get your Anthropic API key
-1. Go to https://console.anthropic.com
-2. Sign up / log in
-3. Go to "API Keys" → "Create Key"
-4. Copy the key (starts with `sk-ant-...`)
-5. Add a small amount of credit if prompted (a few dollars is enough for testing)
-
-### Step 4: Set your API key as an environment variable
-In the Cursor terminal:
-
-**Windows (PowerShell):**
-```
-$env:ANTHROPIC_API_KEY="paste-your-key-here"
-```
-
-**Mac/Linux:**
-```
-export ANTHROPIC_API_KEY="paste-your-key-here"
-```
-
-⚠️ Never paste your key directly into app.py or commit it to GitHub.
-
-### Step 5: Run the backend
-```
-python app.py
-```
-You should see: `Running on http://127.0.0.1:5000`
-Keep this terminal open.
-
-### Step 6: Open the frontend
-In Cursor's file explorer, right-click `index.html` → "Open with Live Server"
-(or just double-click index.html to open it in your browser directly).
-
-### Step 7: Test it
-1. Upload a photo of any medicine strip (a Crocin/Dolo box works fine for testing)
-2. Click "Analyze"
-3. You should see the result card populate in a few seconds
-
-If it fails: check the Cursor terminal running app.py for the error message.
+**Live demo:mediscan-ai-scanner.netlify.app
+**Backend API:(https://med-explainer-ai.onrender.com)
 
 ---
 
-## PART 2 — Deploy it so anyone can use it (later today, ~1 hr)
+## Problem
 
-### Step 1: Push code to GitHub
-1. Create a new repo on github.com (e.g. `medicine-explainer`)
-2. In Cursor terminal:
-```
-git init
-git add .
-git commit -m "Initial commit - medicine explainer"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/medicine-explainer.git
-git push -u origin main
-```
+Many people in India — especially elderly patients or those less comfortable with
+English/medical terminology — struggle to understand what a prescribed medicine is
+for, its side effects, or how to take it. Doctor handwriting makes this worse.
 
-### Step 2: Deploy the backend on Render
-1. Go to https://render.com → sign up with GitHub
-2. Click "New +" → "Web Service"
-3. Connect your `medicine-explainer` repo
-4. Settings:
-   - Build Command: `pip install -r requirements.txt`
-   - Start Command: `python app.py`
-5. Under "Environment Variables", add:
-   - Key: `ANTHROPIC_API_KEY`
-   - Value: your key
-6. Click "Create Web Service"
-7. Once deployed, copy the URL Render gives you (e.g. `https://medicine-explainer.onrender.com`)
+## Solution
 
-### Step 3: Point frontend to your live backend
-In `index.html`, find this line:
-```js
-const BACKEND_URL = "http://localhost:5000/analyze";
-```
-Change it to:
-```js
-const BACKEND_URL = "https://medicine-explainer.onrender.com/analyze";
-```
+Upload a photo, or capture one live via camera, and the app uses Google's Gemini
+Vision AI to read the label/handwriting and explain it in simple language —
+in English or Hindi — including an honest confidence flag on how clearly it
+could read the image.
 
-### Step 4: Deploy the frontend on Netlify
-1. Go to https://app.netlify.com
-2. Drag and drop your `med-explainer` folder onto the Netlify dashboard
-3. Netlify gives you a live URL instantly — that's your working app
+---
 
-### Step 5: Update GitHub with the final frontend change
+## Features
+
+- 📷 **Photo upload or live camera capture** — no need for a separate scanner
+- 🌐 **Bilingual output** — English or Hindi
+- 🎯 **Plain-language breakdown** — purpose, side effects, timing
+- 🩺 **Honest clarity flag** — tells you if the image was hard to read instead of guessing
+- 🔊 **Read Aloud** — accessibility-friendly text-to-speech
+- ⬇️ **Download as PDF** — save or share the result
+- 🕘 **Scan history** — revisit past results (stored locally in your browser)
+- 🌙 **Dark mode**
+- ⚠️ Always includes a disclaimer to consult a doctor/pharmacist — this is an
+  informational tool, not a diagnostic one
+
+---
+
+## Tech Stack
+
+- **Frontend:** HTML, CSS, vanilla JavaScript (no framework — fast and dependency-light)
+- **Backend:** Flask (Python)
+- **AI:** Google Gemini API (vision + language understanding)
+- **Deployment:** Render (backend), Netlify (frontend)
+- **Version control:** Git + GitHub
+
+---
+
+## Architecture
+
 ```
-git add .
-git commit -m "Point frontend to deployed backend"
-git push
+User's browser (index.html)
+        │
+        │  photo + language choice
+        ▼
+Flask backend (app_gemini.py) — hosted on Render
+        │
+        │  image + prompt
+        ▼
+Gemini Vision API
+        │
+        │  structured JSON response
+        ▼
+Rendered result card in browser
 ```
 
 ---
 
-## PART 3 — What to say about it in interviews / resume
+## Running it locally
 
-- **Problem:** Elderly or non-English-comfortable users often can't read
-  prescriptions or understand medicine side effects.
-- **Solution:** A vision-AI tool that explains any medicine photo in plain language.
-- **Stack:** Flask backend, Claude API (vision) for analysis, vanilla JS frontend,
-  deployed on Render + Netlify.
-- **What you'd improve next:** add Hindi/Marathi output, save history per user,
-  add login (this is a good "future work" answer if asked).
+1. Clone this repo:
+   ```
+   git clone https://github.com/Hmali2003/med-explainer-ai.git
+   cd med-explainer-ai
+   ```
+2. Install dependencies:
+   ```
+   pip install -r requirements.txt
+   ```
+3. Get a free Gemini API key from [aistudio.google.com](https://aistudio.google.com)
+4. Set it as an environment variable:
+   ```
+   $env:GEMINI_API_KEY="your-key-here"
+   ```
+5. Run the backend:
+   ```
+   python app_gemini.py
+   ```
+6. Open `index.html` in your browser (make sure `BACKEND_URL` in the script points
+   to `http://localhost:5000/analyze` for local testing)
 
-## Safety note (mention this proactively in interviews — it shows judgment)
-This tool never diagnoses conditions and always tells the user to confirm with
-a doctor or pharmacist. That's a deliberate design choice, not a limitation —
-mention it when you demo the project.
+---
+
+## Deployment
+
+- **Backend:** deployed on Render as a Python web service (`gunicorn app_gemini:app`),
+  with `GEMINI_API_KEY` set as an environment variable
+- **Frontend:** static `index.html` deployed on Netlify, pointing to the live Render URL
+
+---
+
+## Design decisions worth mentioning
+
+- **No diagnosis, ever.** The prompt explicitly instructs the model to explain the
+  medicine only, never guess at the user's condition — a deliberate safety boundary.
+- **Clarity over confidence.** Rather than always giving a confident-sounding answer,
+  the app asks the model to flag when an image is genuinely hard to read, and
+  surfaces that to the user instead of hiding uncertainty.
+- **Free-tier friendly.** Built entirely on free tools (Gemini free tier, Render
+  free tier, Netlify free tier) — intentional, since this was built as a student
+  project with zero budget.
+
+## What I'd improve next
+
+- Support more Indian languages (Marathi, Tamil, etc.)
+- Add user accounts so history syncs across devices instead of staying local
+- Add a simple rate-limit/queue to handle Render's free-tier cold start delay
+- OCR pre-check before sending to the API, to fail faster on unreadable images
+
+---
+
+## Disclaimer
+
+This tool provides general informational content only and is not a substitute
+for professional medical advice. Always consult a doctor or pharmacist before
+making decisions about medication.
+
+---
+
+Built by Harsh Mali — MCA student, K.K. Wagh Institute of Engineering, Nashik.

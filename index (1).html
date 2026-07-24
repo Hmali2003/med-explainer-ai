@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MedExplain AI — Understand Any Medicine Instantly</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+  :root {
+    --bg: #eef1f8;
+    --card: #ffffff;
+    --text: #1a1d29;
+    --muted: #6b7280;
+    --primary: #4f46e5;
+    --primary-dark: #4338ca;
+    --accent: #06b6d4;
+    --border: #e5e7eb;
+    --danger-bg: #fdecea;
+    --danger-text: #a12727;
+    --success-bg: #e6f7ee;
+    --success-text: #157347;
+    --warn-bg: #fff8e6;
+    --warn-text: #8a6400;
+  }
+  [data-theme="dark"] {
+    --bg: #0b0d13;
+    --card: #171a24;
+    --text: #f0f1f5;
+    --muted: #9aa0ac;
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --accent: #22d3ee;
+    --border: #2a2d3a;
+    --danger-bg: #3a1f1f;
+    --danger-text: #f5a3a3;
+    --success-bg: #123324;
+    --success-text: #7fe0ac;
+    --warn-bg: #3a2e12;
+    --warn-text: #ffcf7a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 20px 16px 60px;
+    transition: background 0.3s, color 0.3s;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 540px; margin: 0 auto; }
+
+  .hero {
+    text-align: center;
+    padding: 18px 0 24px;
+  }
+  .hero .badge {
+    display: inline-block;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+  .hero h1 {
+    font-size: 26px;
+    margin: 4px 0 6px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .hero p { color: var(--muted); font-size: 14px; margin: 0; }
+
+  .topbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .pill-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .disclaimer {
+    background: linear-gradient(90deg, #fff4e5, #ffe9cc);
+    border: 1px solid #ffcc80;
+    color: #7a4b00;
+    font-size: 12.5px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+  }
+  [data-theme="dark"] .disclaimer {
+    background: #3a2e12;
+    border-color: #6b4e12;
+    color: #ffcf7a;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+    border: 1px solid var(--border);
+    margin-bottom: 18px;
+  }
+
+  .lang-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .lang-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .lang-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .upload-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  .dropzone {
+    flex: 1;
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    padding: 24px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .dropzone.dragover {
+    border-color: var(--primary);
+    background: rgba(79, 70, 229, 0.06);
+  }
+  .dropzone .dz-icon { font-size: 26px; margin-bottom: 6px; }
+  .dropzone p { margin: 2px 0; color: var(--muted); font-size: 12.5px; }
+  .dropzone input { display: none; }
+
+  .camera-btn {
+    flex: 1;
+    border: 2px dashed var(--border);
+    border-radius: 14px;
+    background: transparent;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12.5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .camera-btn .dz-icon { font-size: 26px; }
+  .camera-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+  #cameraView {
+    display: none;
+    margin-top: 14px;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+  }
+  #cameraView video { width: 100%; display: block; }
+  .camera-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .camera-controls button {
+    flex: 1;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 600;
+  }
+  .capture-btn { background: var(--primary); color: white; }
+  .cancel-btn { background: var(--border); color: var(--text); }
+
+  #previewWrap {
+    display: none;
+    margin-top: 14px;
+    position: relative;
+  }
+  #preview {
+    width: 100%;
+    border-radius: 12px;
+    max-height: 220px;
+    object-fit: cover;
+  }
+  #removeImg {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .analyze-btn {
+    width: 100%;
+    margin-top: 16px;
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    color: white;
+    border: none;
+    padding: 13px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .analyze-btn:hover:not(:disabled) { opacity: 0.9; }
+  .analyze-btn:active:not(:disabled) { transform: scale(0.98); }
+  .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  .spinner.show { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .result-card {
+    display: none;
+    animation: fadeUp 0.4s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+    gap: 10px;
+  }
+  .result-header h3 { margin: 0; font-size: 18px; }
+  .clarity-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    text-transform: capitalize;
+  }
+  .clarity-clear { background: var(--success-bg); color: var(--success-text); }
+  .clarity-partially-readable { background: var(--warn-bg); color: var(--warn-text); }
+  .clarity-unclear { background: var(--danger-bg); color: var(--danger-text); }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0 16px;
+  }
+  .action-btn {
+    flex: 1;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 7px 8px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .action-btn:hover { color: var(--primary); border-color: var(--primary); }
+  .action-btn.speaking { color: var(--accent); border-color: var(--accent); }
+
+  .field {
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .field:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+  .field-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 4px;
+  }
+  .field-value { font-size: 14.5px; line-height: 1.5; }
+
+  .warning-box {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-top: 12px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1a1d29;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    max-width: 90%;
+    text-align: center;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .history-section h4 {
+    font-size: 14px;
+    color: var(--muted);
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item:hover { color: var(--primary); }
+  .history-time { font-size: 11.5px; color: var(--muted); }
+  .empty-history { color: var(--muted); font-size: 13px; text-align: center; padding: 10px 0; }
+  .clear-history {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+    margin-top: 8px;
+  }
+
+  .footer-stats {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 20px;
+  }
+</style>
+</head>
+<body data-theme="light">
+  <div class="wrap">
+    <div class="topbar">
+      <button class="pill-btn" id="themeToggle">🌙 Dark</button>
+    </div>
+
+    <div class="hero">
+      <span class="badge">AI Powered</span>
+      <h1>💊 MedExplain AI</h1>
+      <p>Understand any medicine strip or prescription in seconds</p>
+    </div>
+
+    <div class="disclaimer">
+      ⚠️ General information only, not medical advice. Always confirm with your doctor or pharmacist.
+    </div>
+
+    <div class="card">
+      <div class="lang-row">
+        <button class="lang-btn active" data-lang="english">English</button>
+        <button class="lang-btn" data-lang="hindi">हिंदी</button>
+      </div>
+
+      <div class="upload-row" id="uploadRow">
+        <div class="dropzone" id="dropzone">
+          <div class="dz-icon">📷</div>
+          <p><strong>Upload photo</strong></p>
+          <p>click or drag & drop</p>
+          <input type="file" id="imageInput" accept="image/*" />
+        </div>
+        <button class="camera-btn" id="cameraBtn">
+          <span class="dz-icon">🎥</span>
+          <span>Use Live Camera</span>
+        </button>
+      </div>
+
+      <div id="cameraView">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <div class="camera-controls">
+          <button class="capture-btn" id="captureBtn">📸 Capture</button>
+          <button class="cancel-btn" id="cancelCameraBtn">Cancel</button>
+        </div>
+      </div>
+
+      <div id="previewWrap">
+        <button id="removeImg">✕</button>
+        <img id="preview" />
+      </div>
+
+      <button class="analyze-btn" id="analyzeBtn">
+        <span class="spinner" id="spinner"></span>
+        <span id="btnText">Analyze Medicine</span>
+      </button>
+    </div>
+
+    <div class="card result-card" id="resultCard">
+      <div class="result-header">
+        <h3 id="medName"></h3>
+        <span class="clarity-badge" id="clarityBadge"></span>
+      </div>
+
+      <div class="action-row">
+        <button class="action-btn" id="copyBtn">📋 Copy</button>
+        <button class="action-btn" id="speakBtn">🔊 Read Aloud</button>
+        <button class="action-btn" id="pdfBtn">⬇️ Save PDF</button>
+      </div>
+
+      <div id="pdfContent">
+        <div class="field">
+          <div class="field-label">🎯 Purpose</div>
+          <div class="field-value" id="purpose"></div>
+        </div>
+        <div class="field">
+          <div class="field-label">⚠️ Common Side Effects</div>
+          <div class="field-value" id="sideEffects"></div>
+        </div>
+        <div class="field">
+          <div class="field-label">⏰ Typical Timing</div>
+          <div class="field-value" id="timing"></div>
+        </div>
+
+        <div class="warning-box">
+          <span>🩺</span>
+          <span id="warning"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card history-section">
+      <h4>Recent Scans</h4>
+      <div id="historyList"><div class="empty-history">No scans yet — your history will appear here</div></div>
+      <button class="clear-history" id="clearHistory" style="display:none;">Clear history</button>
+    </div>
+
+    <div class="footer-stats" id="footerStats"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  // ⚠️ After deploying your backend (see README), change this to your live Render URL, e.g.:
+  // const BACKEND_URL = "https://med-explainer-api.onrender.com/analyze";
+  const BACKEND_URL = "http://localhost:5000/analyze";
+
+  const dropzone = document.getElementById("dropzone");
+  const imageInput = document.getElementById("imageInput");
+  const uploadRow = document.getElementById("uploadRow");
+  const previewWrap = document.getElementById("previewWrap");
+  const preview = document.getElementById("preview");
+  const removeImg = document.getElementById("removeImg");
+  const analyzeBtn = document.getElementById("analyzeBtn");
+  const spinner = document.getElementById("spinner");
+  const btnText = document.getElementById("btnText");
+  const resultCard = document.getElementById("resultCard");
+  const toast = document.getElementById("toast");
+  const themeToggle = document.getElementById("themeToggle");
+  const historyList = document.getElementById("historyList");
+  const clearHistoryBtn = document.getElementById("clearHistory");
+  const copyBtn = document.getElementById("copyBtn");
+  const speakBtn = document.getElementById("speakBtn");
+  const pdfBtn = document.getElementById("pdfBtn");
+  const cameraBtn = document.getElementById("cameraBtn");
+  const cameraView = document.getElementById("cameraView");
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const captureBtn = document.getElementById("captureBtn");
+  const cancelCameraBtn = document.getElementById("cancelCameraBtn");
+  const footerStats = document.getElementById("footerStats");
+
+  let selectedFile = null;
+  let lastResult = null;
+  let currentLang = "english";
+  let cameraStream = null;
+
+  // ---- Theme toggle ----
+  function applyTheme(theme) {
+    document.body.setAttribute("data-theme", theme);
+    themeToggle.textContent = theme === "dark" ? "☀️ Light" : "🌙 Dark";
+    localStorage.setItem("medexplain-theme", theme);
+  }
+  themeToggle.addEventListener("click", () => {
+    const current = document.body.getAttribute("data-theme");
+    applyTheme(current === "dark" ? "light" : "dark");
+  });
+  applyTheme(localStorage.getItem("medexplain-theme") || "light");
+
+  // ---- Language toggle ----
+  document.querySelectorAll(".lang-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".lang-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentLang = btn.dataset.lang;
+    });
+  });
+
+  // ---- Toast ----
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add("show");
+    setTimeout(() => toast.classList.remove("show"), 2800);
+  }
+
+  // ---- Drag & drop ----
+  dropzone.addEventListener("click", () => imageInput.click());
+  dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+  dropzone.addEventListener("dragleave", () => dropzone.classList.remove("dragover"));
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("dragover");
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  imageInput.addEventListener("change", (e) => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.type.startsWith("image/")) {
+      showToast("Please upload an image file");
+      return;
+    }
+    selectedFile = file;
+    preview.src = URL.createObjectURL(file);
+    previewWrap.style.display = "block";
+    uploadRow.style.display = "none";
+    resultCard.style.display = "none";
+  }
+
+  removeImg.addEventListener("click", (e) => {
+    e.stopPropagation();
+    selectedFile = null;
+    previewWrap.style.display = "none";
+    uploadRow.style.display = "flex";
+    imageInput.value = "";
+  });
+
+  // ---- Live camera capture ----
+  cameraBtn.addEventListener("click", async () => {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      video.srcObject = cameraStream;
+      cameraView.style.display = "block";
+      uploadRow.style.display = "none";
+    } catch (err) {
+      showToast("Could not access camera. Check browser permissions.");
+    }
+  });
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      cameraStream = null;
+    }
+    cameraView.style.display = "none";
+  }
+
+  cancelCameraBtn.addEventListener("click", () => {
+    stopCamera();
+    uploadRow.style.display = "flex";
+  });
+
+  captureBtn.addEventListener("click", () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+      handleFile(file);
+      stopCamera();
+    }, "image/jpeg", 0.92);
+  });
+
+  // ---- Analyze ----
+  analyzeBtn.addEventListener("click", async () => {
+    if (!selectedFile) {
+      showToast("Please choose or capture an image first");
+      return;
+    }
+
+    spinner.classList.add("show");
+    btnText.textContent = "Analyzing…";
+    analyzeBtn.disabled = true;
+    resultCard.style.display = "none";
+
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+    formData.append("language", currentLang);
+
+    try {
+      const res = await fetch(BACKEND_URL, { method: "POST", body: formData });
+      const data = await res.json();
+
+      if (data.error) {
+        showToast("Error: " + data.error);
+      } else {
+        renderResult(data);
+        saveToHistory(data);
+        bumpScanCount();
+      }
+    } catch (err) {
+      showToast("Could not reach the server. Is your backend running or deployed?");
+    } finally {
+      spinner.classList.remove("show");
+      btnText.textContent = "Analyze Medicine";
+      analyzeBtn.disabled = false;
+    }
+  });
+
+  function renderResult(data) {
+    lastResult = data;
+    document.getElementById("medName").textContent = data.medicine_name;
+    document.getElementById("purpose").textContent = data.purpose;
+    document.getElementById("sideEffects").textContent = Array.isArray(data.common_side_effects)
+      ? data.common_side_effects.join(", ")
+      : data.common_side_effects;
+    document.getElementById("timing").textContent = data.timing;
+    document.getElementById("warning").textContent = data.warning;
+
+    const badge = document.getElementById("clarityBadge");
+    const clarity = (data.clarity || "clear").toLowerCase().replace(/\s+/g, "-");
+    badge.textContent = data.clarity || "Clear";
+    badge.className = "clarity-badge clarity-" + clarity;
+
+    resultCard.style.display = "block";
+    resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  // ---- Copy ----
+  copyBtn.addEventListener("click", () => {
+    if (!lastResult) return;
+    const text = `Medicine: ${lastResult.medicine_name}
+Purpose: ${lastResult.purpose}
+Side Effects: ${Array.isArray(lastResult.common_side_effects) ? lastResult.common_side_effects.join(", ") : lastResult.common_side_effects}
+Timing: ${lastResult.timing}
+Note: ${lastResult.warning}`;
+    navigator.clipboard.writeText(text).then(() => showToast("Copied to clipboard"));
+  });
+
+  // ---- Read aloud ----
+  let speaking = false;
+  speakBtn.addEventListener("click", () => {
+    if (!lastResult) return;
+    if (speaking) {
+      window.speechSynthesis.cancel();
+      speaking = false;
+      speakBtn.classList.remove("speaking");
+      return;
+    }
+    const text = `${lastResult.medicine_name}. Purpose: ${lastResult.purpose}. Side effects: ${
+      Array.isArray(lastResult.common_side_effects) ? lastResult.common_side_effects.join(", ") : lastResult.common_side_effects
+    }. Timing: ${lastResult.timing}. ${lastResult.warning}`;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = currentLang === "hindi" ? "hi-IN" : "en-IN";
+    utterance.onend = () => { speaking = false; speakBtn.classList.remove("speaking"); };
+    window.speechSynthesis.speak(utterance);
+    speaking = true;
+    speakBtn.classList.add("speaking");
+  });
+
+  // ---- Download PDF ----
+  pdfBtn.addEventListener("click", () => {
+    if (!lastResult) return;
+    const element = document.getElementById("resultCard");
+    html2pdf().from(element).set({
+      margin: 10,
+      filename: `${lastResult.medicine_name.replace(/\s+/g, "_")}_report.pdf`,
+      html2canvas: { scale: 2 },
+    }).save();
+  });
+
+  // ---- History (saved in this browser only) ----
+  function getHistory() {
+    try { return JSON.parse(localStorage.getItem("medexplain-history") || "[]"); }
+    catch { return []; }
+  }
+
+  function saveToHistory(data) {
+    const history = getHistory();
+    history.unshift({ ...data, time: new Date().toLocaleString() });
+    localStorage.setItem("medexplain-history", JSON.stringify(history.slice(0, 8)));
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const history = getHistory();
+    if (!history.length) {
+      historyList.innerHTML = '<div class="empty-history">No scans yet — your history will appear here</div>';
+      clearHistoryBtn.style.display = "none";
+      return;
+    }
+    clearHistoryBtn.style.display = "inline-block";
+    historyList.innerHTML = "";
+    history.forEach((item) => {
+      const div = document.createElement("div");
+      div.className = "history-item";
+      div.innerHTML = `<span>${item.medicine_name}</span><span class="history-time">${item.time}</span>`;
+      div.addEventListener("click", () => renderResult(item));
+      historyList.appendChild(div);
+    });
+  }
+
+  clearHistoryBtn.addEventListener("click", () => {
+    localStorage.removeItem("medexplain-history");
+    renderHistory();
+    showToast("History cleared");
+  });
+
+  // ---- Scan counter (just a nice footer stat, local only) ----
+  function bumpScanCount() {
+    const count = parseInt(localStorage.getItem("medexplain-count") || "0", 10) + 1;
+    localStorage.setItem("medexplain-count", count);
+    renderStats();
+  }
+  function renderStats() {
+    const count = localStorage.getItem("medexplain-count") || "0";
+    footerStats.textContent = `${count} medicine${count === "1" ? "" : "s"} explained on this device`;
+  }
+
+  renderHistory();
+  renderStats();
+</script>
+</body>
+</html>

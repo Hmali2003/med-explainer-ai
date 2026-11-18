@@ -11,8 +11,33 @@ CORS(app)  # allows your frontend (different domain) to call this backend
 
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-# Models are tried in this order. If one is busy or retired, the next is used.
-MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
+# Backup names, used only after the models your key can really use.
+BACKUP_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]
+
+_model_cache = []
+
+
+def get_models():
+    """Ask Google which Flash models THIS API key can use right now (cached)."""
+    global _model_cache
+    if _model_cache:
+        return _model_cache
+
+    found = []
+    try:
+        for m in client.models.list():
+            name = (m.name or "").replace("models/", "")
+            actions = getattr(m, "supported_actions", None) or []
+            bad = ["image", "tts", "live", "audio", "embedding", "robotics", "computer"]
+            if "flash" in name and "generateContent" in actions and not any(b in name for b in bad):
+                found.append(name)
+    except Exception:
+        pass
+
+    found.sort(reverse=True)  # newest-looking names first
+    models = found + [b for b in BACKUP_MODELS if b not in found]
+    _model_cache = models
+    return models
 
 
 def build_prompt(language):
@@ -48,9 +73,9 @@ Rules:
 
 
 def call_gemini(prompt, image_bytes, media_type):
-    """Try each model; retry once on overload; skip models that no longer exist."""
+    """Try each model; retry once on overload; skip models that are not available."""
     last_error = None
-    for model in MODELS:
+    for model in get_models():
         for attempt in range(2):
             try:
                 return client.models.generate_content(
@@ -64,7 +89,7 @@ def call_gemini(prompt, image_bytes, media_type):
                 last_error = e
                 msg = str(e)
                 if "404" in msg or "NOT_FOUND" in msg:
-                    break  # model not available -> go to next model
+                    break  # model not available -> next model
                 if "503" in msg or "429" in msg or "UNAVAILABLE" in msg:
                     time.sleep(2)  # busy -> retry once, then next model
                     continue
@@ -95,6 +120,12 @@ def analyze():
         return jsonify({"error": "Could not parse AI response", "raw": raw_text}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/models", methods=["GET"])
+def list_models():
+    """Debug page: shows which models the code will try, in order."""
+    return jsonify({"models_tried_in_order": get_models()})
 
 
 @app.route("/", methods=["GET"])

@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from google import genai
@@ -9,6 +10,10 @@ app = Flask(__name__)
 CORS(app)  # allows your frontend (different domain) to call this backend
 
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+# Models are tried in this order. If one is busy or retired, the next is used.
+MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
+
 
 def build_prompt(language):
     lang_instruction = {
@@ -41,11 +46,9 @@ Rules:
 - Output must be valid JSON and nothing else - no markdown fences, no extra text.
 """
 
-import time
-
-MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
 
 def call_gemini(prompt, image_bytes, media_type):
+    """Try each model; retry once on overload; skip models that no longer exist."""
     last_error = None
     for model in MODELS:
         for attempt in range(2):
@@ -60,11 +63,15 @@ def call_gemini(prompt, image_bytes, media_type):
             except Exception as e:
                 last_error = e
                 msg = str(e)
+                if "404" in msg or "NOT_FOUND" in msg:
+                    break  # model not available -> go to next model
                 if "503" in msg or "429" in msg or "UNAVAILABLE" in msg:
-                    time.sleep(2)   # short wait, then retry / try next model
+                    time.sleep(2)  # busy -> retry once, then next model
                     continue
-                raise               # other errors: stop immediately
+                raise  # any other error -> stop immediately
     raise last_error
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     if "image" not in request.files:
@@ -75,6 +82,7 @@ def analyze():
     media_type = file.mimetype or "image/jpeg"
     language = request.form.get("language", "english")
 
+    raw_text = ""
     try:
         response = call_gemini(build_prompt(language), image_bytes, media_type)
 

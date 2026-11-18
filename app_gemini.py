@@ -41,7 +41,30 @@ Rules:
 - Output must be valid JSON and nothing else - no markdown fences, no extra text.
 """
 
+import time
 
+MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+
+def call_gemini(prompt, image_bytes, media_type):
+    last_error = None
+    for model in MODELS:
+        for attempt in range(2):
+            try:
+                return client.models.generate_content(
+                    model=model,
+                    contents=[
+                        prompt,
+                        types.Part.from_bytes(data=image_bytes, mime_type=media_type),
+                    ],
+                )
+            except Exception as e:
+                last_error = e
+                msg = str(e)
+                if "503" in msg or "429" in msg or "UNAVAILABLE" in msg:
+                    time.sleep(2)   # short wait, then retry / try next model
+                    continue
+                raise               # other errors: stop immediately
+    raise last_error
 @app.route("/analyze", methods=["POST"])
 def analyze():
     if "image" not in request.files:
@@ -53,13 +76,7 @@ def analyze():
     language = request.form.get("language", "english")
 
     try:
-        response = client.models.generate_content(
-            model="gemini-flash-latest",
-            contents=[
-                build_prompt(language),
-                types.Part.from_bytes(data=image_bytes, mime_type=media_type),
-            ],
-        )
+        response = call_gemini(build_prompt(language), image_bytes, media_type)
 
         raw_text = response.text.strip()
         cleaned = raw_text.replace("```json", "").replace("```", "").strip()

@@ -9,7 +9,11 @@ from google.genai import types
 app = Flask(__name__)
 CORS(app)  # allows your frontend (different domain) to call this backend
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Each Gemini call gives up after 25 seconds so the request never hangs.
+client = genai.Client(
+    api_key=os.environ.get("GEMINI_API_KEY"),
+    http_options=types.HttpOptions(timeout=25000),
+)
 
 # Backup names, used only after the models your key can really use.
 BACKUP_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]
@@ -18,7 +22,7 @@ _model_cache = []
 
 
 def get_models():
-    """Ask Google which Flash models THIS API key can use right now (cached)."""
+    """Ask Google which Flash models THIS API key can use (cached). Max 3 models."""
     global _model_cache
     if _model_cache:
         return _model_cache
@@ -28,14 +32,14 @@ def get_models():
         for m in client.models.list():
             name = (m.name or "").replace("models/", "")
             actions = getattr(m, "supported_actions", None) or []
-            bad = ["image", "tts", "live", "audio", "embedding", "robotics", "computer"]
+            bad = ["image", "tts", "live", "audio", "embedding", "robotics", "computer", "preview"]
             if "flash" in name and "generateContent" in actions and not any(b in name for b in bad):
                 found.append(name)
     except Exception:
         pass
 
     found.sort(reverse=True)  # newest-looking names first
-    models = found + [b for b in BACKUP_MODELS if b not in found]
+    models = (found + [b for b in BACKUP_MODELS if b not in found])[:3]
     _model_cache = models
     return models
 
@@ -73,27 +77,24 @@ Rules:
 
 
 def call_gemini(prompt, image_bytes, media_type):
-    """Try each model; retry once on overload; skip models that are not available."""
+    """Try each model once; skip models that are busy, slow or not available."""
     last_error = None
     for model in get_models():
-        for attempt in range(2):
-            try:
-                return client.models.generate_content(
-                    model=model,
-                    contents=[
-                        prompt,
-                        types.Part.from_bytes(data=image_bytes, mime_type=media_type),
-                    ],
-                )
-            except Exception as e:
-                last_error = e
-                msg = str(e)
-                if "404" in msg or "NOT_FOUND" in msg:
-                    break  # model not available -> next model
-                if "503" in msg or "429" in msg or "UNAVAILABLE" in msg:
-                    time.sleep(2)  # busy -> retry once, then next model
-                    continue
-                raise  # any other error -> stop immediately
+        try:
+            return client.models.generate_content(
+                model=model,
+                contents=[
+                    prompt,
+                    types.Part.from_bytes(data=image_bytes, mime_type=media_type),
+                ],
+            )
+        except Exception as e:
+            last_error = e
+            msg = str(e)
+            if any(code in msg for code in ["404", "NOT_FOUND", "503", "429", "UNAVAILABLE", "timed out", "Timeout", "timeout"]):
+                time.sleep(1)
+                continue  # try the next model
+            raise  # any other error -> stop immediately
     raise last_error
 
 

@@ -9,20 +9,33 @@ from google.genai import types
 app = Flask(__name__)
 CORS(app)  # allows your frontend (different domain) to call this backend
 
-# Each Gemini call gives up after 25 seconds so the request never hangs.
+# Each Gemini call gives up after 20 seconds so one slow model never blocks everything.
 client = genai.Client(
     api_key=os.environ.get("GEMINI_API_KEY"),
-    http_options=types.HttpOptions(timeout=25000),
+    http_options=types.HttpOptions(timeout=20000),
 )
 
 # Backup names, used only after the models your key can really use.
 BACKUP_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]
 
+# Total time allowed for one scan (seconds). Must stay below the gunicorn timeout (120).
+TOTAL_BUDGET = 100
+
+# Errors that mean "this model is busy/slow/missing" -> just try the next one.
+RETRY_WORDS = [
+    "404", "NOT_FOUND",
+    "429", "RESOURCE_EXHAUSTED",
+    "500", "INTERNAL",
+    "503", "UNAVAILABLE",
+    "504", "DEADLINE_EXCEEDED",
+    "timed out", "imeout",
+]
+
 _model_cache = []
 
 
 def get_models():
-    """Ask Google which Flash models THIS API key can use (cached). Max 6 models."""
+    """Ask Google which Flash models THIS API key can use (cached). Max 5 models."""
     global _model_cache
     if _model_cache:
         return _model_cache
@@ -39,7 +52,7 @@ def get_models():
         pass
 
     found.sort(reverse=True)  # newest-looking names first
-    models = (found + [b for b in BACKUP_MODELS if b not in found])[:6]
+    models = (found + [b for b in BACKUP_MODELS if b not in found])[:5]
     _model_cache = models
     return models
 
@@ -77,10 +90,15 @@ Rules:
 
 
 def call_gemini(prompt, image_bytes, media_type):
-    """Go through the models up to 3 rounds, waiting a little between rounds."""
+    """Keep trying models (in rounds) until one works or the time budget is used up."""
+    start = time.time()
     last_error = None
+    config = types.GenerateContentConfig(response_mime_type="application/json")
+
     for round_no in range(3):
         for model in get_models():
+            if time.time() - start > TOTAL_BUDGET:
+                raise last_error or Exception("Time limit reached, please try again")
             try:
                 return client.models.generate_content(
                     model=model,
@@ -88,14 +106,14 @@ def call_gemini(prompt, image_bytes, media_type):
                         prompt,
                         types.Part.from_bytes(data=image_bytes, mime_type=media_type),
                     ],
+                    config=config,
                 )
             except Exception as e:
                 last_error = e
-                msg = str(e)
-                if any(c in msg for c in ["404", "NOT_FOUND", "503", "429", "UNAVAILABLE", "timed out", "imeout"]):
+                if any(w in str(e) for w in RETRY_WORDS):
                     continue  # try the next model
-                raise  # any other error -> stop immediately
-        time.sleep(3)  # all models busy -> wait, then try again
+                raise  # real error (bad key, bad request) -> stop now
+        time.sleep(2)  # all models busy -> short wait, then another round
     raise last_error
 
 

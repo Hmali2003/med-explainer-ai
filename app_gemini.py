@@ -22,7 +22,7 @@ _model_cache = []
 
 
 def get_models():
-    """Ask Google which Flash models THIS API key can use (cached). Max 3 models."""
+    """Ask Google which Flash models THIS API key can use (cached). Max 6 models."""
     global _model_cache
     if _model_cache:
         return _model_cache
@@ -39,7 +39,7 @@ def get_models():
         pass
 
     found.sort(reverse=True)  # newest-looking names first
-    models = (found + [b for b in BACKUP_MODELS if b not in found])[:3]
+    models = (found + [b for b in BACKUP_MODELS if b not in found])[:6]
     _model_cache = models
     return models
 
@@ -77,24 +77,25 @@ Rules:
 
 
 def call_gemini(prompt, image_bytes, media_type):
-    """Try each model once; skip models that are busy, slow or not available."""
+    """Go through the models up to 3 rounds, waiting a little between rounds."""
     last_error = None
-    for model in get_models():
-        try:
-            return client.models.generate_content(
-                model=model,
-                contents=[
-                    prompt,
-                    types.Part.from_bytes(data=image_bytes, mime_type=media_type),
-                ],
-            )
-        except Exception as e:
-            last_error = e
-            msg = str(e)
-            if any(code in msg for code in ["404", "NOT_FOUND", "503", "429", "UNAVAILABLE", "timed out", "Timeout", "timeout"]):
-                time.sleep(1)
-                continue  # try the next model
-            raise  # any other error -> stop immediately
+    for round_no in range(3):
+        for model in get_models():
+            try:
+                return client.models.generate_content(
+                    model=model,
+                    contents=[
+                        prompt,
+                        types.Part.from_bytes(data=image_bytes, mime_type=media_type),
+                    ],
+                )
+            except Exception as e:
+                last_error = e
+                msg = str(e)
+                if any(c in msg for c in ["404", "NOT_FOUND", "503", "429", "UNAVAILABLE", "timed out", "imeout"]):
+                    continue  # try the next model
+                raise  # any other error -> stop immediately
+        time.sleep(3)  # all models busy -> wait, then try again
     raise last_error
 
 
